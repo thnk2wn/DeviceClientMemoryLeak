@@ -53,7 +53,7 @@ namespace RenewDeviceClientMemoryLeak.Tasks
         private void OutputHealthInfo()
         {
             Process p = Process.GetCurrentProcess();
-            long memoryBytes = p.WorkingSet64;
+            long memoryBytes = p.PrivateMemorySize64;
 
             if (!_baselineMemoryBytes.HasValue)
             {
