@@ -34,6 +34,17 @@ namespace RenewDeviceClientMemoryLeak
                 return -1;
             }
 
+            Console.WriteLine();
+
+            Console.Write("Renew IoT hub connection periodically (y/n)? ");
+            ConsoleKeyInfo key = Console.ReadKey();
+
+            Console.WriteLine();
+            Console.WriteLine();
+
+            bool renewHubConnection = key.Key == ConsoleKey.Y;
+            Console.WriteLine();
+
             CancellationToken cancelToken = cancellationTokenSource.Token;
 
             IMetricsRoot metrics = MetricsFactory.Create();
@@ -43,6 +54,19 @@ namespace RenewDeviceClientMemoryLeak
 
             var tasksModule = new TasksModule(deviceHubClient, metrics);
             List<Task> tasks = tasksModule.GetTasks(cancelToken).ToList();
+
+            if (renewHubConnection)
+            {
+                const int intervalMinutes = 5;
+                Log.Information(
+                    "IoT hub connection will be recreated every {interval} minutes regardless of status",
+                    intervalMinutes);
+                tasks.Add(deviceHubClient.RenewClientAsync(cancelToken, intervalMinutes));
+            }
+            else
+            {
+                Log.Information("IoT hub connection will not be periodically recreated");
+            }
 
             try
             {

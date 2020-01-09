@@ -44,15 +44,16 @@ namespace RenewDeviceClientMemoryLeak
             await ConnectToHubAsync(cancellationToken);
         }
 
-        [Obsolete("Remove this if only reconnecting when health checks fail is sufficient. Forcing creates memory leaks")]
-        public async Task RenewClientAsync(CancellationToken cancellationToken)
+        // Using this is a bit of nuclear bomb to kill a fly and seems to attribute to memory leaks
+        // Was originally put in to fix scenarios where devices would disconnect and never reconnect.
+        public async Task RenewClientAsync(CancellationToken cancellationToken, int intervalMinutes)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
                     // 15 in real app
-                    await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
+                    await Task.Delay(TimeSpan.FromMinutes(intervalMinutes), cancellationToken);
 
                     if (IsConnInProgress) continue;
 
@@ -156,6 +157,7 @@ namespace RenewDeviceClientMemoryLeak
 
                 if (isReconnect)
                 {
+                    Log.Information("Disposing existing Device Client");
                     _currentDeviceClient.SetConnectionStatusChangesHandler(null);
                     _currentDeviceClient.Dispose();
                 }

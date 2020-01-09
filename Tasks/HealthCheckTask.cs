@@ -16,10 +16,14 @@ namespace RenewDeviceClientMemoryLeak.Tasks
         private readonly IMetricsRoot _metrics;
         private static readonly TimeSpan monitorInterval = TimeSpan.FromSeconds(30);
 
-        private long? _baselineMemoryBytes;
+        private long _baselineMemoryBytes;
         private int _gcCycles;
+        private long _maxMemoryBytes;
 
         public GCEventListener _listener;
+
+        private readonly object _outputHealthLock = new object();
+        private readonly object _outputGcLock = new object();
 
         public HealthCheckTask(IMetricsRoot metrics)
         {
@@ -34,7 +38,11 @@ namespace RenewDeviceClientMemoryLeak.Tasks
 
                 while (!cancelToken.IsCancellationRequested)
                 {
-                    OutputHealthInfo();
+                    lock (_outputHealthLock)
+                    {
+                        OutputHealthInfo();
+                    }
+
                     await Task.Delay(monitorInterval, cancelToken);
                 }
             }
@@ -55,9 +63,14 @@ namespace RenewDeviceClientMemoryLeak.Tasks
             Process p = Process.GetCurrentProcess();
             long memoryBytes = p.PrivateMemorySize64;
 
-            if (!_baselineMemoryBytes.HasValue)
+            if (_baselineMemoryBytes == 0)
             {
                 _baselineMemoryBytes = memoryBytes;
+            }
+
+            if (memoryBytes > _maxMemoryBytes)
+            {
+                _maxMemoryBytes = memoryBytes;
             }
 
             TimeSpan uptime = DateTime.Now - p.StartTime;
@@ -65,9 +78,10 @@ namespace RenewDeviceClientMemoryLeak.Tasks
             Console.WriteLine();
 
             Log.Information(
-                "Memory => Current: {currentMemory}, Baseline: {baselineMemory}. GC cycles: {gcCycles}",
+                "Memory => Current: {currentMemory}, Baseline: {baselineMemory}, Max: {maxMemory}. GC cycles: {gcCycles}",
                 memoryBytes.Bytes().Humanize("0.0"),
-                _baselineMemoryBytes.Value.Bytes().Humanize("0.0"),
+                _baselineMemoryBytes.Bytes().Humanize("0.0"),
+                _maxMemoryBytes.Bytes().Humanize("0.0"),
                 _gcCycles);
 
             MetricsContextValueSource iotContext = _metrics.Snapshot.Get()?.Contexts?.FirstOrDefault(
@@ -100,10 +114,13 @@ namespace RenewDeviceClientMemoryLeak.Tasks
 
         private void OnGarbageCollected()
         {
-            _gcCycles++;
-            Console.WriteLine();
-            Log.Information("*** Detected system garbage collection. Cycles: {gcCycles} ***", _gcCycles);
-            Console.WriteLine();
+            lock (_outputGcLock)
+            {
+                _gcCycles++;
+                Console.WriteLine();
+                Log.Information("*** Detected system garbage collection. Cycles: {gcCycles} ***", _gcCycles);
+                Console.WriteLine();
+            }
         }
     }
 }
