@@ -16,7 +16,7 @@ namespace RenewDeviceClientMemoryLeak.Tasks
         private readonly IMetricsRoot _metrics;
         private static readonly TimeSpan monitorInterval = TimeSpan.FromSeconds(30);
 
-        private float? _baselineMemoryMb;
+        private long? _baselineMemoryBytes;
         private int _gcCycles;
 
         public GCEventListener _listener;
@@ -53,11 +53,11 @@ namespace RenewDeviceClientMemoryLeak.Tasks
         private void OutputHealthInfo()
         {
             Process p = Process.GetCurrentProcess();
-            float memoryMb = p.WorkingSet64 / 1024f / 1024f;
+            long memoryBytes = p.WorkingSet64;
 
-            if (!_baselineMemoryMb.HasValue)
+            if (!_baselineMemoryBytes.HasValue)
             {
-                _baselineMemoryMb = memoryMb;
+                _baselineMemoryBytes = memoryBytes;
             }
 
             TimeSpan uptime = DateTime.Now - p.StartTime;
@@ -65,9 +65,9 @@ namespace RenewDeviceClientMemoryLeak.Tasks
             Console.WriteLine();
 
             Log.Information(
-                "Memory => Current: {memoryMb:###.00} MB, Baseline: {baseline:###.00} MB. GC cycles: {gcCycles}",
-                memoryMb,
-                _baselineMemoryMb,
+                "Memory => Current: {currentMemory}, Baseline: {baselineMemory}. GC cycles: {gcCycles}",
+                memoryBytes.Bytes().Humanize("0.0"),
+                _baselineMemoryBytes.Value.Bytes().Humanize("0.0"),
                 _gcCycles);
 
             MetricsContextValueSource iotContext = _metrics.Snapshot.Get()?.Contexts?.FirstOrDefault(
@@ -83,14 +83,13 @@ namespace RenewDeviceClientMemoryLeak.Tasks
 
                 if (eventCounter != null && bytesCounter != null)
                 {
-                    float mbSent = bytesCounter.Value.Count / 1024f / 1024f;
                     double roughEventsPerMin = eventCounter.Value.Count / uptime.TotalMinutes;
 
                     Log.Information(
-                        "Iot Hub Events => {eventsCount:###,###,##0} events, Rate / min: {eventRate:##0}, sent: {mbSent:###,##0.00} MB",
+                        "Iot Hub Events => {eventsCount:###,###,##0} events, Rate / min: {eventRate:##0}, sent: {sentSize}",
                         eventCounter.Value.Count,
                         roughEventsPerMin,
-                        mbSent);
+                        bytesCounter.Value.Count.Bytes().Humanize("0.0"));
                 }
             }
 
