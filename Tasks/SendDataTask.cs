@@ -1,7 +1,7 @@
 ﻿using System;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
-using RenewDeviceClientMemoryLeak.Data;
 
 namespace RenewDeviceClientMemoryLeak.Tasks
 {
@@ -9,20 +9,20 @@ namespace RenewDeviceClientMemoryLeak.Tasks
     {
         private readonly DeviceHubClient _deviceHubClient;
 
-        public SendDataTask(DeviceHubClient deviceHubClient)
+        public SendDataTask(
+            DeviceHubClient deviceHubClient)
         {
             _deviceHubClient = deviceHubClient;
         }
 
         public async Task Run(CancellationToken cancelToken)
         {
-            var r = new Random();
-
             while (!cancelToken.IsCancellationRequested)
             {
-                await _deviceHubClient.SendData(SampleDeviceData.GetBytes(), cancelToken);
+                await _deviceHubClient.SendSampleData(cancelToken);
 
-                await Task.Delay(TimeSpan.FromSeconds(r.Next(2, 5)), cancelToken);
+                int delay = RandomNumberGenerator.GetInt32(1, 5);
+                await Task.Delay(TimeSpan.FromSeconds(delay), cancelToken);
             }
         }
     }

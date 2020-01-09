@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using App.Metrics;
 
 namespace RenewDeviceClientMemoryLeak.Tasks
 {
@@ -9,10 +10,10 @@ namespace RenewDeviceClientMemoryLeak.Tasks
         private readonly SendDataTask _sendDataTask;
         private readonly HealthCheckTask _healthCheckTask;
 
-        public TasksModule(DeviceHubClient deviceHubClient)
+        public TasksModule(DeviceHubClient deviceHubClient, IMetricsRoot metrics)
         {
             _sendDataTask = new SendDataTask(deviceHubClient);
-            _healthCheckTask = new HealthCheckTask();
+            _healthCheckTask = new HealthCheckTask(metrics);
         }
 
         public IEnumerable<Task> GetTasks(CancellationToken cancelToken)

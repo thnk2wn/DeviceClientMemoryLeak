@@ -2,8 +2,11 @@
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using App.Metrics;
 using Microsoft.Azure.Devices.Client;
 using RenewDeviceClientMemoryLeak.Config;
+using RenewDeviceClientMemoryLeak.Data;
+using RenewDeviceClientMemoryLeak.Diagnostics;
 using Serilog;
 
 namespace RenewDeviceClientMemoryLeak
@@ -11,6 +14,7 @@ namespace RenewDeviceClientMemoryLeak
     internal class DeviceHubClient
     {
         private readonly DeviceConfiguration _deviceConfig;
+        private readonly IMetrics _metrics;
         private CancellationToken _cancellationToken;
         private DeviceClient _currentDeviceClient;
         private MethodCallback _directMethodCallback;
@@ -18,15 +22,21 @@ namespace RenewDeviceClientMemoryLeak
 
         public bool IsConnInProgress { get; private set; }
 
-        public DeviceHubClient(DeviceConfiguration deviceConfig)
+        public DeviceHubClient(
+            DeviceConfiguration deviceConfig,
+            IMetrics metrics)
         {
             _deviceConfig = deviceConfig;
+            _metrics = metrics;
         }
 
         public async Task EnsureHubConnectionAsync(MethodCallback callback, CancellationToken cancellationToken)
         {
             IsConnInProgress = false;
-            Log.Information("Establishing initial connection to IoT Hub.");
+            Log.Information(
+                "Establishing initial connection to IoT Hub {hub} for device {device}",
+                _deviceConfig.HubHostname,
+                _deviceConfig.DeviceId);
 
             _cancellationToken = cancellationToken;
             _directMethodCallback = callback ?? throw new ArgumentNullException(nameof(callback));
@@ -60,7 +70,13 @@ namespace RenewDeviceClientMemoryLeak
             }
         }
 
-        public async Task SendData(byte[] contents, CancellationToken cancelToken)
+        public async Task SendSampleData(CancellationToken cancelToken)
+        {
+            byte[] sampleData = SampleDeviceData.GetBytes();
+            await SendData(sampleData, cancelToken);
+        }
+
+        private async Task SendData(byte[] contents, CancellationToken cancelToken)
         {
             Log.Information(
                 "Sending {count:###,###,##0} bytes of data to hub",
@@ -69,6 +85,8 @@ namespace RenewDeviceClientMemoryLeak
             using (Message hubMessage = CreateMessage(contents))
             {
                 await _currentDeviceClient.SendEventAsync(hubMessage, cancelToken);
+                _metrics.Measure.Counter.Increment(MetricsRegistry.IotHubBytesSent, contents.Length);
+                _metrics.Measure.Counter.Increment(MetricsRegistry.IotHubEvents);
             }
         }
 
@@ -104,9 +122,10 @@ namespace RenewDeviceClientMemoryLeak
             await deviceClient.OpenAsync(cancellationToken);
 
             Log.Information(
-                "Connection to hub {host} opened with transport {transportType}",
+                "Connection to hub {host} opened with transport {transportType} for device {device}",
                 deviceConfig.HubHostname,
-                transportType);
+                transportType,
+                deviceConfig.DeviceId);
 
             return deviceClient;
         }

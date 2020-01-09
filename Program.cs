@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using App.Metrics;
 using Microsoft.Azure.Devices.Client;
 using RenewDeviceClientMemoryLeak.Config;
 using RenewDeviceClientMemoryLeak.Data;
+using RenewDeviceClientMemoryLeak.Diagnostics;
 using RenewDeviceClientMemoryLeak.Tasks;
 using Serilog;
 
@@ -34,10 +36,12 @@ namespace RenewDeviceClientMemoryLeak
 
             CancellationToken cancelToken = cancellationTokenSource.Token;
 
-            var deviceHubClient = new DeviceHubClient(config);
+            IMetricsRoot metrics = MetricsFactory.Create();
+
+            var deviceHubClient = new DeviceHubClient(config, metrics);
             await deviceHubClient.EnsureHubConnectionAsync(DispatchDirectCall, cancelToken);
 
-            var tasksModule = new TasksModule(deviceHubClient);
+            var tasksModule = new TasksModule(deviceHubClient, metrics);
             List<Task> tasks = tasksModule.GetTasks(cancelToken).ToList();
 
             try
@@ -59,7 +63,7 @@ namespace RenewDeviceClientMemoryLeak
         private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
         {
             Console.WriteLine("Cancellation detected, stopping execution");
-            cancellationTokenSource.Cancel();
+            cancellationTokenSource.Cancel(throwOnFirstException: false);
             e.Cancel = true;
 
             //Environment.Exit(-2);

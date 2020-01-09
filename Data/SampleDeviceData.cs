@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Security.Cryptography;
 using System.Text;
 
 namespace RenewDeviceClientMemoryLeak.Data
@@ -12,7 +12,7 @@ namespace RenewDeviceClientMemoryLeak.Data
 
         public static byte[] GetBytes()
         {
-            int repeat = new Random().Next(1, 70);
+            int repeat = RandomNumberGenerator.GetInt32(2, 150);
             var sb = new StringBuilder();
 
             for (var i = 0; i < repeat; i++)
