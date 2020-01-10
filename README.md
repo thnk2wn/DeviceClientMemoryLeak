@@ -5,4 +5,6 @@ Originally the source app would forcibly recreate the Device Client every 15 min
 
 So far those exact conditions have not been recreated with this sample app. However memory usage with the hub does exceed expectations and not as much memory is reclaimed as would be expected.
 
+To run, copy `appSettings.json` to `appSettings.private.json` and set `DeviceId`, `DeviceKey`, and `HubHostName` according to the target IoT environment. Then `dotnet publish -c Release` and run via published exe or via memory profiler such as dotMemory.
+
 ![](.attachments/screenshot.png)
